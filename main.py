@@ -31,6 +31,7 @@ def prepare_inputs(image, text, processor):
 
     return encoding
 
+
 def postprocess(text: str, image_size: tuple[int]):
     """Process model output into action dictionary"""
     pattern = r"</s><s>(<[^>]+>|[^<\s]+)\s*([^<]*?)(<loc_\d+>.*)"
@@ -51,17 +52,22 @@ def postprocess(text: str, image_size: tuple[int]):
         location = re.findall(point_pattern, text)[0]
         if len(location) > 0:
             point = [int(loc) for loc in location]
-
+            
+            # Get actual screen size
+            screen_width, screen_height = pyautogui.size()
+            
+            # Scale points based on screen size instead of image size
             rescaled_point = (
-                int((point[0] / 1000) * image_size[0]),
-                int((point[1] / 1000) * image_size[1]),
+                int((point[0] / 1000) * screen_width),
+                int((point[1] / 1000) * screen_height)
             )
 
             result["click_point"] = rescaled_point
         else:
             result["click_point"] = (0, 0)
 
-    except Exception:
+    except Exception as e:
+        print(f"Error in postprocess: {str(e)}")
         result["click_point"] = (0, 0)
 
     return result
@@ -69,9 +75,30 @@ def postprocess(text: str, image_size: tuple[int]):
 def execute_action(action_dict):
     """Execute the action based on the dictionary"""
     if action_dict["action"] == "click" and action_dict["click_point"] != (0, 0):
-        x, y = action_dict["click_point"]
-        pyautogui.click(x, y)
-        return True
+        try:
+            # Get screen size
+            screen_width, screen_height = pyautogui.size()
+            x, y = action_dict["click_point"]
+            
+            # Ensure coordinates are within screen bounds
+            x = min(max(0, x), screen_width - 1)
+            y = min(max(0, y), screen_height - 1)
+            
+            print(f"Screen size: {screen_width}x{screen_height}")
+            print(f"Current mouse position: {pyautogui.position()}")
+            print(f"Adjusted click position: ({x}, {y})")
+            
+            # Move mouse first
+            pyautogui.moveTo(x, y, duration=0.5)
+            time.sleep(0.2)
+            
+            # Click
+            pyautogui.click(x=x, y=y)
+            return True
+            
+        except Exception as e:
+            print(f"Click failed: {str(e)}")
+            return False
     return False
 
 def main():
