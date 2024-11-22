@@ -7,13 +7,11 @@ import pyautogui
 import time
 
 def take_screenshot():
-    """Take a screenshot and return it as PIL Image"""
     screenshot = pyautogui.screenshot()
     return screenshot
 
 def prepare_inputs(image, text, processor):
-    """Prepare inputs for the model"""
-    # Convert to RGB if not already
+    
     if image.mode != "RGB":
         image = image.convert("RGB")
     
@@ -33,7 +31,6 @@ def prepare_inputs(image, text, processor):
 
 
 def postprocess(text: str, image_size: tuple[int]):
-    """Process model output into action dictionary"""
     pattern = r"</s><s>(<[^>]+>|[^<\s]+)\s*([^<]*?)(<loc_\d+>.*)"
     point_pattern = r"<loc_(\d+)><loc_(\d+)>"
     match = re.search(pattern, text)
@@ -73,14 +70,11 @@ def postprocess(text: str, image_size: tuple[int]):
     return result
 
 def execute_action(action_dict):
-    """Execute the action based on the dictionary"""
     if action_dict["action"] == "click" and action_dict["click_point"] != (0, 0):
         try:
-            # Get screen size
             screen_width, screen_height = pyautogui.size()
             x, y = action_dict["click_point"]
             
-            # Ensure coordinates are within screen bounds
             x = min(max(0, x), screen_width - 1)
             y = min(max(0, y), screen_height - 1)
             
@@ -88,7 +82,6 @@ def execute_action(action_dict):
             print(f"Current mouse position: {pyautogui.position()}")
             print(f"Adjusted click position: ({x}, {y})")
             
-            # Move mouse first
             pyautogui.moveTo(x, y, duration=0.5)
             time.sleep(0.2)
             
@@ -114,39 +107,32 @@ def main():
     ).to(device)
     
     while True:
-        # Get command from user
+
         text = input("\nEnter your command (or 'quit' to exit): ")
         
         if text.lower() == 'quit':
             break
             
-        # Give user time to prepare the screen
-        print("Taking screenshot in 3 seconds...")
-        time.sleep(3)
+        print("Taking screenshot...")
         
-        # Take screenshot
         screenshot = take_screenshot()
         
-        # Prepare inputs
         inputs = prepare_inputs(screenshot, text, processor)
         img_size = inputs.pop("image_size")
         
-        # Move inputs to device
         inputs = {k: v.to(device) for k, v in inputs.items()}
         
-        # Generate prediction
         print("Analyzing screenshot...")
         outputs = model.generate(**inputs)
         
-        # Process outputs
         generated_texts = processor.batch_decode(outputs, skip_special_tokens=False)
         result = postprocess(generated_texts[0], img_size)
         
-        # Print result
         print("Action dictionary:", result)
         
-        # Execute action
-        print("Executing action...")
+        print("Executing action in 3 seconds...")
+        time.sleep(3)
+        
         if execute_action(result):
             print("Action executed successfully!")
         else:
